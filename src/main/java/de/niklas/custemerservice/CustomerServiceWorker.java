@@ -1,6 +1,7 @@
 package de.niklas.custemerservice;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -21,6 +22,12 @@ import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.amazonaws.regions.Regions;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+
 import de.niklas.custemerservice.model.Auftraege;
 import de.niklas.custemerservice.model.Kunde;
 import de.niklas.custemerservice.repository.AuftraegeRepository;
@@ -32,6 +39,10 @@ public class CustomerServiceWorker {
 
 	public static final String[] HEADERS = { "Firma", "Strasse", "Strassenzusatz", "Ort", "Land", "PLZ", "Vorname", "Nachname", "Kunden-ID" };
 
+    private static Regions clientRegion = Regions.EU_CENTRAL_1;
+    private static String bucketName = "berndsbucket1";
+    
+    
 	private AuftraegeRepository auftraegeRepo;
 	private KundenRepository kundenRepo;
 
@@ -69,6 +80,9 @@ public class CustomerServiceWorker {
 	
 	private void makeCSVProLand(String dateString, String land, ArrayList<Kunde> kunden) {
 		String filename = land + dateString + ".csv";
+		String stringObjKeyName = land + dateString;
+	    String fileObjKeyName = filename;
+	    //String fileName = "/tmp/Test.csv";
 
 		BufferedWriter writer;
 		try {
@@ -82,6 +96,23 @@ public class CustomerServiceWorker {
 			}
 			csvPrinter.flush();
 			csvPrinter.close();
+			
+		     //This code expects that you have AWS credentials set up per:
+            // https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/setup-credentials.html
+            AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+                    .withRegion(clientRegion)
+                    .build();
+
+            // Upload a text string as a new object.
+            s3Client.putObject(bucketName, stringObjKeyName, "Uploaded String Object");
+
+            // Upload a file as a new object with ContentType and title specified.
+            PutObjectRequest request = new PutObjectRequest(bucketName, fileObjKeyName, new File(filename));
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType("plain/text");
+            metadata.addUserMetadata("title", "someTitle");
+            request.setMetadata(metadata);
+            s3Client.putObject(request);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
